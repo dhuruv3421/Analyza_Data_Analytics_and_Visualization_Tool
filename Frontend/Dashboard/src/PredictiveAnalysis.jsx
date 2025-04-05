@@ -421,13 +421,12 @@ function PredictiveAnalysis() {
               <p className="mt-2 text-sm text-gray-600">
                 {targetInfo.is_binary 
                   ? "The target is binary categorical - available models: Logistic Regression, KNN, Naive Bayes, Random Forest, AdaBoost, Gradient Boost, XGBoost"
-                  : "The target is multi-class categorical - available models: KNN, Naive Bayes, Random Forest, AdaBoost, Gradient Boost, XGBoost"}
+                  : "The target is multi-class categorical - available models: KNN, Naive Bayes, Random Forest, AdaBoost, Gradient Boost, XGBoost"}
               </p>
             )}
-
             {!targetInfo.is_categorical && targetVariable && (
               <p className="mt-2 text-sm text-gray-600">
-                The target is numeric - available models: Linear Regression, Polynomial Regression, KNN, Random Forest, AdaBoost, Gradient Boost, XGBoost.
+              The target is numeric - available models: Linear Regression, Polynomial Regression, KNN, Random Forest, AdaBoost, Gradient Boost, XGBoost
               </p>
             )}
           </div>
