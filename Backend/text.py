@@ -45,7 +45,7 @@ genai.configure(api_key="AIzaSyCuprg9AkogSSWpri0cbKpvFUVJpz_X2Vk")
 # Allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://analyza-dashboard.onrender.com"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -157,398 +157,6 @@ async def analyze_data(file: UploadFile = File(...), query: str = Form(...)):
         return {"error": str(e)}
     
 
-# @app.post("/predictive-analysis")
-# async def predictive_analysis(
-#     file: UploadFile = File(...),
-#     target: Optional[str] = Form(None),
-#     features: Optional[str] = Form(None),
-#     model: Optional[str] = Form(None),
-#     suggest: bool = Form(False),
-#     polynomial_degree: Optional[int] = Form(2),  # For polynomial regression
-#     n_neighbors: Optional[int] = Form(5),  # For KNN
-# ):
-#     try:
-#         # Read the uploaded file
-#         df = await read_uploaded_file(file)
-        
-#         # Provide suggestions if requested
-#         if suggest:
-#             suggestions = suggest_target_and_features(df, api_key='AIzaSyAZp_icM6RRxryPP1zu-guOSd_LMWRSpUU')
-#             return suggestions
-        
-#         # Parse features (sent as JSON string)
-#         feature_list = json.loads(features) if features else []
-        
-#         # Check if target and features exist in dataframe
-#         if target not in df.columns:
-#             raise HTTPException(
-#                 status_code=400, detail=f"Target column '{target}' not found in dataset"
-#             )
-
-#         for feature in feature_list:
-#             if feature not in df.columns:
-#                 raise HTTPException(
-#                     status_code=400, detail=f"Feature '{feature}' not found in dataset"
-#                 )
-
-#         # Prepare data
-#         X = df[feature_list].copy()
-#         y = df[target].copy()
-
-#         # Handle missing values
-#         numeric_cols = X.select_dtypes(include=["number"]).columns
-#         categorical_cols = X.select_dtypes(include=["object", "category"]).columns
-
-#         if len(numeric_cols) > 0 and X[numeric_cols].isnull().any().any():
-#             numeric_imputer = SimpleImputer(strategy="mean")
-#             X[numeric_cols] = numeric_imputer.fit_transform(X[numeric_cols])
-
-#         if len(categorical_cols) > 0 and X[categorical_cols].isnull().any().any():
-#             categorical_imputer = SimpleImputer(strategy="most_frequent")
-#             X[categorical_cols] = categorical_imputer.fit_transform(X[categorical_cols])
-
-#         # Encode categorical features
-#         encoders = {}
-#         for col in categorical_cols:
-#             encoders[col] = LabelEncoder()
-#             X[col] = encoders[col].fit_transform(X[col])
-
-#         # Determine if target is categorical
-#         is_categorical = y.dtype == "object" or y.dtype.name == "category"
-#         # Determine if target is binary (only relevant if categorical)
-#         is_binary = False
-#         if is_categorical:
-#             unique_values = y.nunique()
-#             is_binary = unique_values == 2
-
-#         # Encode target if it's categorical
-#         target_encoder = None
-#         if is_categorical:
-#             target_encoder = LabelEncoder()
-#             y = target_encoder.fit_transform(y)
-
-#         # Split data
-#         X_train, X_test, y_train, y_test = train_test_split(
-#             X, y, test_size=0.3, random_state=42
-#         )
-
-#         # Process model selection
-#         if model == "Linear Regression":
-#             if is_categorical:
-#                 raise HTTPException(
-#                     status_code=400, 
-#                     detail="Linear Regression cannot be used with categorical target variables"
-#                 )
-                
-#             model_instance = LinearRegression()
-#             model_instance.fit(X_train, y_train)
-#             y_pred = model_instance.predict(X_test)
-
-#             # Get coefficients
-#             coefficients = {}
-#             for feature, coef in zip(feature_list, model_instance.coef_):
-#                 coefficients[feature] = float(coef)
-
-#             response = {
-#                 "mse": float(mean_squared_error(y_test, y_pred)),
-#                 "r2": float(r2_score(y_test, y_pred)),
-#                 "coefficients": {
-#                     "intercept": float(model_instance.intercept_),
-#                     **coefficients,
-#                 },
-#             }
-
-#         elif model == "Polynomial Regression":
-#             if is_categorical:
-#                 raise HTTPException(
-#                     status_code=400, 
-#                     detail="Polynomial Regression cannot be used with categorical target variables"
-#                 )
-                
-#             # Create polynomial features
-#             poly = PolynomialFeatures(degree=polynomial_degree)
-#             X_train_poly = poly.fit_transform(X_train)
-#             X_test_poly = poly.transform(X_test)
-            
-#             # Fit linear regression to polynomial features
-#             model_instance = LinearRegression()
-#             model_instance.fit(X_train_poly, y_train)
-#             y_pred = model_instance.predict(X_test_poly)
-            
-#             response = {
-#                 "mse": float(mean_squared_error(y_test, y_pred)),
-#                 "r2": float(r2_score(y_test, y_pred)),
-#                 "polynomial_degree": polynomial_degree,
-#                 "coefficients": {
-#                     "intercept": float(model_instance.intercept_),
-#                     "feature_count": len(model_instance.coef_),
-#                 },
-#             }
-
-#         elif model == "Logistic Regression":
-#             if not is_categorical:
-#                 raise HTTPException(
-#                     status_code=400, 
-#                     detail="Logistic Regression can only be used with categorical target variables"
-#                 )
-#             if not is_binary:
-#                 raise HTTPException(
-#                     status_code=400, 
-#                     detail="Logistic Regression is only available for binary classification"
-#                 )
-                
-#             model_instance = LogisticRegression(max_iter=1000)
-#             model_instance.fit(X_train, y_train)
-#             y_pred = model_instance.predict(X_test)
-
-#             response = {
-#                 "accuracy": float(accuracy_score(y_test, y_pred)),
-#                 "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                 "classification_report": classification_report(
-#                     y_test, y_pred, output_dict=True
-#                 ),
-#             }
-
-#         elif model == "KNN":
-#             model_instance = KNeighborsClassifier(n_neighbors=n_neighbors) if is_categorical else KNeighborsRegressor(n_neighbors=n_neighbors)
-#             model_instance.fit(X_train, y_train)
-#             y_pred = model_instance.predict(X_test)
-            
-#             if is_categorical:
-#                 response = {
-#                     "accuracy": float(accuracy_score(y_test, y_pred)),
-#                     "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                     "classification_report": classification_report(
-#                         y_test, y_pred, output_dict=True
-#                     ),
-#                     "n_neighbors": n_neighbors,
-#                 }
-#             else:
-#                 response = {
-#                     "mse": float(mean_squared_error(y_test, y_pred)),
-#                     "r2": float(r2_score(y_test, y_pred)),
-#                     "n_neighbors": n_neighbors,
-#                 }
-                
-#         elif model == "Naive Bayes":
-#             if not is_categorical:
-#                 raise HTTPException(
-#                     status_code=400, 
-#                     detail="Naive Bayes can only be used with categorical target variables"
-#                 )
-                
-#             # Choose appropriate Naive Bayes variant
-#             # For numerical features, use Gaussian Naive Bayes
-#             model_instance = GaussianNB()
-#             model_instance.fit(X_train, y_train)
-#             y_pred = model_instance.predict(X_test)
-            
-#             response = {
-#                 "accuracy": float(accuracy_score(y_test, y_pred)),
-#                 "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                 "classification_report": classification_report(
-#                     y_test, y_pred, output_dict=True
-#                 ),
-#             }
-
-#         elif model == "Random Forest":
-#             if is_categorical:  # Classification
-#                 model_instance = RandomForestClassifier(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-
-#                 response = {
-#                     "accuracy": float(accuracy_score(y_test, y_pred)),
-#                     "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                     "classification_report": classification_report(
-#                         y_test, y_pred, output_dict=True
-#                     ),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-#             else:  # Regression
-#                 model_instance = RandomForestRegressor(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-
-#                 response = {
-#                     "mse": float(mean_squared_error(y_test, y_pred)),
-#                     "r2": float(r2_score(y_test, y_pred)),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-                
-#         elif model == "AdaBoost":
-#             if is_categorical:  # Classification
-#                 base_estimator = DecisionTreeClassifier(max_depth=1)
-#                 model_instance = AdaBoostClassifier(estimator=base_estimator, random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "accuracy": float(accuracy_score(y_test, y_pred)),
-#                     "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                     "classification_report": classification_report(
-#                         y_test, y_pred, output_dict=True
-#                     ),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-#             else:  # Regression
-#                 base_estimator = DecisionTreeRegressor(max_depth=1)
-#                 model_instance = AdaBoostRegressor(base_estimator=base_estimator, random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "mse": float(mean_squared_error(y_test, y_pred)),
-#                     "r2": float(r2_score(y_test, y_pred)),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-                
-#         elif model == "Gradient Boost":
-#             if is_categorical:  # Classification
-#                 model_instance = GradientBoostingClassifier(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "accuracy": float(accuracy_score(y_test, y_pred)),
-#                     "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                     "classification_report": classification_report(
-#                         y_test, y_pred, output_dict=True
-#                     ),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-#             else:  # Regression
-#                 model_instance = GradientBoostingRegressor(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "mse": float(mean_squared_error(y_test, y_pred)),
-#                     "r2": float(r2_score(y_test, y_pred)),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-                
-#         elif model == "XGBoost":
-#             if is_categorical:  # Classification
-#                 model_instance = XGBClassifier(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "accuracy": float(accuracy_score(y_test, y_pred)),
-#                     "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-#                     "classification_report": classification_report(
-#                         y_test, y_pred, output_dict=True
-#                     ),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-#             else:  # Regression
-#                 model_instance = XGBRegressor(random_state=42)
-#                 model_instance.fit(X_train, y_train)
-#                 y_pred = model_instance.predict(X_test)
-                
-#                 response = {
-#                     "mse": float(mean_squared_error(y_test, y_pred)),
-#                     "r2": float(r2_score(y_test, y_pred)),
-#                     "feature_importance": dict(
-#                         zip(feature_list, model_instance.feature_importances_.tolist())
-#                     ),
-#                 }
-#         else:
-#             raise HTTPException(
-#                 status_code=400, detail=f"Unsupported model type: {model}"
-#             )
-
-#         # Create a visualization
-#         plt.figure(figsize=(10, 6))
-
-#         if (model == "Linear Regression" or model == "Polynomial Regression") and not is_categorical:
-#             # Create a scatter plot of actual vs predicted values
-#             plt.scatter(y_test, y_pred, alpha=0.5)
-
-#             # Add a perfect prediction line
-#             min_val = min(min(y_test), min(y_pred))
-#             max_val = max(max(y_test), max(y_pred))
-#             plt.plot([min_val, max_val], [min_val, max_val], "r--")
-
-#             plt.xlabel("Actual Values")
-#             plt.ylabel("Predicted Values")
-#             plt.title(f"Actual vs Predicted: {target}")
-            
-#         elif model == "KNN" and not is_categorical:
-#             # For KNN regression, show actual vs predicted
-#             plt.scatter(y_test, y_pred, alpha=0.5)
-#             min_val = min(min(y_test), min(y_pred))
-#             max_val = max(max(y_test), max(y_pred))
-#             plt.plot([min_val, max_val], [min_val, max_val], "r--")
-#             plt.xlabel("Actual Values")
-#             plt.ylabel("Predicted Values")
-#             plt.title(f"KNN Regression: Actual vs Predicted ({n_neighbors} neighbors)")
-
-#         elif is_categorical and model in ["Logistic Regression", "Random Forest", "KNN", "Naive Bayes", "AdaBoost", "Gradient Boost", "XGBoost"]:
-#             # Create a confusion matrix heatmap for classification models
-#             cm = confusion_matrix(y_test, y_pred)
-#             sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-#             plt.xlabel("Predicted")
-#             plt.ylabel("Actual")
-#             plt.title(f"Confusion Matrix - {model}")
-
-#         else:  # For regression models with feature importance
-#             if hasattr(model_instance, 'feature_importances_'):
-#                 # Feature importance plot
-#                 importances = model_instance.feature_importances_
-#                 indices = np.argsort(importances)
-
-#                 plt.barh(range(len(indices)), importances[indices])
-#                 plt.yticks(range(len(indices)), [feature_list[i] for i in indices])
-#                 plt.xlabel("Feature Importance")
-#                 plt.title(f"Feature Importance in {model}")
-#             else:
-#                 # Default plot for models without feature importance
-#                 plt.scatter(y_test, y_pred, alpha=0.5)
-#                 min_val = min(min(y_test), min(y_pred))
-#                 max_val = max(max(y_test), max(y_pred))
-#                 plt.plot([min_val, max_val], [min_val, max_val], "r--")
-#                 plt.xlabel("Actual Values")
-#                 plt.ylabel("Predicted Values")
-#                 plt.title(f"Actual vs Predicted: {target}")
-
-#         # Save the plot and convert to base64
-#         img_buf = BytesIO()
-#         plt.savefig(img_buf, format="png")
-#         plt.close()
-#         img_buf.seek(0)
-#         img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-
-#         # Add the visualization to the response
-#         response["visualization"] = img_base64
-        
-#         # Add information about the target variable type to help the frontend
-#         response["target_info"] = {
-#             "is_categorical": is_categorical,
-#             "is_binary": is_binary
-#         }
-
-#         return response
-
-#     except Exception as e:
-#         print("Error:", str(e))
-#         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/predictive-analysis")
 async def predictive_analysis(
     file: UploadFile = File(...),
@@ -556,8 +164,8 @@ async def predictive_analysis(
     features: Optional[str] = Form(None),
     model: Optional[str] = Form(None),
     suggest: bool = Form(False),
-    polynomial_degree: Optional[int] = Form(2),
-    n_neighbors: Optional[int] = Form(5),
+    polynomial_degree: Optional[int] = Form(2),  # For polynomial regression
+    n_neighbors: Optional[int] = Form(5),  # For KNN
 ):
     try:
         # Read the uploaded file
@@ -587,22 +195,6 @@ async def predictive_analysis(
         X = df[feature_list].copy()
         y = df[target].copy()
 
-        # Improved target type detection
-        unique_values = y.nunique()
-        total_values = len(y)
-        
-        is_categorical = (
-            y.dtype == "object" or 
-            y.dtype.name == "category" or
-            (unique_values / total_values < 0.05 and unique_values <= 20) or
-            any(isinstance(x, str) for x in y.dropna().head(10))
-        )
-        
-        # Check if binary classification
-        is_binary = False
-        if is_categorical:
-            is_binary = unique_values == 2
-
         # Handle missing values
         numeric_cols = X.select_dtypes(include=["number"]).columns
         categorical_cols = X.select_dtypes(include=["object", "category"]).columns
@@ -620,6 +212,14 @@ async def predictive_analysis(
         for col in categorical_cols:
             encoders[col] = LabelEncoder()
             X[col] = encoders[col].fit_transform(X[col])
+
+        # Determine if target is categorical
+        is_categorical = y.dtype == "object" or y.dtype.name == "category"
+        # Determine if target is binary (only relevant if categorical)
+        is_binary = False
+        if is_categorical:
+            unique_values = y.nunique()
+            is_binary = unique_values == 2
 
         # Encode target if it's categorical
         target_encoder = None
@@ -701,19 +301,11 @@ async def predictive_analysis(
             model_instance.fit(X_train, y_train)
             y_pred = model_instance.predict(X_test)
 
-            # Convert predictions back to original labels if encoded
-            if target_encoder:
-                y_test_original = target_encoder.inverse_transform(y_test)
-                y_pred_original = target_encoder.inverse_transform(y_pred)
-            else:
-                y_test_original = y_test
-                y_pred_original = y_pred
-
             response = {
-                "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                "accuracy": float(accuracy_score(y_test, y_pred)),
+                "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                 "classification_report": classification_report(
-                    y_test_original, y_pred_original, output_dict=True
+                    y_test, y_pred, output_dict=True
                 ),
             }
 
@@ -723,19 +315,11 @@ async def predictive_analysis(
             y_pred = model_instance.predict(X_test)
             
             if is_categorical:
-                # Convert predictions back to original labels if encoded
-                if target_encoder:
-                    y_test_original = target_encoder.inverse_transform(y_test)
-                    y_pred_original = target_encoder.inverse_transform(y_pred)
-                else:
-                    y_test_original = y_test
-                    y_pred_original = y_pred
-
                 response = {
-                    "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                    "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                    "accuracy": float(accuracy_score(y_test, y_pred)),
+                    "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                     "classification_report": classification_report(
-                        y_test_original, y_pred_original, output_dict=True
+                        y_test, y_pred, output_dict=True
                     ),
                     "n_neighbors": n_neighbors,
                 }
@@ -753,51 +337,37 @@ async def predictive_analysis(
                     detail="Naive Bayes can only be used with categorical target variables"
                 )
                 
+            # Choose appropriate Naive Bayes variant
+            # For numerical features, use Gaussian Naive Bayes
             model_instance = GaussianNB()
             model_instance.fit(X_train, y_train)
             y_pred = model_instance.predict(X_test)
             
-            # Convert predictions back to original labels if encoded
-            if target_encoder:
-                y_test_original = target_encoder.inverse_transform(y_test)
-                y_pred_original = target_encoder.inverse_transform(y_pred)
-            else:
-                y_test_original = y_test
-                y_pred_original = y_pred
-
             response = {
-                "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                "accuracy": float(accuracy_score(y_test, y_pred)),
+                "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                 "classification_report": classification_report(
-                    y_test_original, y_pred_original, output_dict=True
+                    y_test, y_pred, output_dict=True
                 ),
             }
 
         elif model == "Random Forest":
-            if is_categorical:
+            if is_categorical:  # Classification
                 model_instance = RandomForestClassifier(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
 
-                # Convert predictions back to original labels if encoded
-                if target_encoder:
-                    y_test_original = target_encoder.inverse_transform(y_test)
-                    y_pred_original = target_encoder.inverse_transform(y_pred)
-                else:
-                    y_test_original = y_test
-                    y_pred_original = y_pred
-
                 response = {
-                    "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                    "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                    "accuracy": float(accuracy_score(y_test, y_pred)),
+                    "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                     "classification_report": classification_report(
-                        y_test_original, y_pred_original, output_dict=True
+                        y_test, y_pred, output_dict=True
                     ),
                     "feature_importance": dict(
                         zip(feature_list, model_instance.feature_importances_.tolist())
                     ),
                 }
-            else:
+            else:  # Regression
                 model_instance = RandomForestRegressor(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
@@ -811,36 +381,28 @@ async def predictive_analysis(
                 }
                 
         elif model == "AdaBoost":
-            if is_categorical:
+            if is_categorical:  # Classification
                 base_estimator = DecisionTreeClassifier(max_depth=1)
-                model_instance = AdaBoostClassifier(estimator=base_estimator, random_state=42)
+                model_instance = AdaBoostClassifier(base_estimator=base_estimator, random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
-                # Convert predictions back to original labels if encoded
-                if target_encoder:
-                    y_test_original = target_encoder.inverse_transform(y_test)
-                    y_pred_original = target_encoder.inverse_transform(y_pred)
-                else:
-                    y_test_original = y_test
-                    y_pred_original = y_pred
-
+                
                 response = {
-                    "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                    "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                    "accuracy": float(accuracy_score(y_test, y_pred)),
+                    "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                     "classification_report": classification_report(
-                        y_test_original, y_pred_original, output_dict=True
+                        y_test, y_pred, output_dict=True
                     ),
                     "feature_importance": dict(
                         zip(feature_list, model_instance.feature_importances_.tolist())
                     ),
                 }
-            else:
+            else:  # Regression
                 base_estimator = DecisionTreeRegressor(max_depth=1)
-                model_instance = AdaBoostRegressor(estimator=base_estimator, random_state=42)
+                model_instance = AdaBoostRegressor(base_estimator=base_estimator, random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
+                
                 response = {
                     "mse": float(mean_squared_error(y_test, y_pred)),
                     "r2": float(r2_score(y_test, y_pred)),
@@ -850,34 +412,26 @@ async def predictive_analysis(
                 }
                 
         elif model == "Gradient Boost":
-            if is_categorical:
+            if is_categorical:  # Classification
                 model_instance = GradientBoostingClassifier(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
-                # Convert predictions back to original labels if encoded
-                if target_encoder:
-                    y_test_original = target_encoder.inverse_transform(y_test)
-                    y_pred_original = target_encoder.inverse_transform(y_pred)
-                else:
-                    y_test_original = y_test
-                    y_pred_original = y_pred
-
+                
                 response = {
-                    "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                    "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                    "accuracy": float(accuracy_score(y_test, y_pred)),
+                    "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                     "classification_report": classification_report(
-                        y_test_original, y_pred_original, output_dict=True
+                        y_test, y_pred, output_dict=True
                     ),
                     "feature_importance": dict(
                         zip(feature_list, model_instance.feature_importances_.tolist())
                     ),
                 }
-            else:
+            else:  # Regression
                 model_instance = GradientBoostingRegressor(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
+                
                 response = {
                     "mse": float(mean_squared_error(y_test, y_pred)),
                     "r2": float(r2_score(y_test, y_pred)),
@@ -887,34 +441,26 @@ async def predictive_analysis(
                 }
                 
         elif model == "XGBoost":
-            if is_categorical:
+            if is_categorical:  # Classification
                 model_instance = XGBClassifier(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
-                # Convert predictions back to original labels if encoded
-                if target_encoder:
-                    y_test_original = target_encoder.inverse_transform(y_test)
-                    y_pred_original = target_encoder.inverse_transform(y_pred)
-                else:
-                    y_test_original = y_test
-                    y_pred_original = y_pred
-
+                
                 response = {
-                    "accuracy": float(accuracy_score(y_test_original, y_pred_original)),
-                    "confusion_matrix": confusion_matrix(y_test_original, y_pred_original).tolist(),
+                    "accuracy": float(accuracy_score(y_test, y_pred)),
+                    "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
                     "classification_report": classification_report(
-                        y_test_original, y_pred_original, output_dict=True
+                        y_test, y_pred, output_dict=True
                     ),
                     "feature_importance": dict(
                         zip(feature_list, model_instance.feature_importances_.tolist())
                     ),
                 }
-            else:
+            else:  # Regression
                 model_instance = XGBRegressor(random_state=42)
                 model_instance.fit(X_train, y_train)
                 y_pred = model_instance.predict(X_test)
-
+                
                 response = {
                     "mse": float(mean_squared_error(y_test, y_pred)),
                     "r2": float(r2_score(y_test, y_pred)),
@@ -955,7 +501,7 @@ async def predictive_analysis(
 
         elif is_categorical and model in ["Logistic Regression", "Random Forest", "KNN", "Naive Bayes", "AdaBoost", "Gradient Boost", "XGBoost"]:
             # Create a confusion matrix heatmap for classification models
-            cm = confusion_matrix(y_test_original, y_pred_original)
+            cm = confusion_matrix(y_test, y_pred)
             sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
             plt.xlabel("Predicted")
             plt.ylabel("Actual")
@@ -994,9 +540,7 @@ async def predictive_analysis(
         # Add information about the target variable type to help the frontend
         response["target_info"] = {
             "is_categorical": is_categorical,
-            "is_binary": is_binary,
-            "unique_values": unique_values,
-            "dtype": str(df[target].dtype)
+            "is_binary": is_binary
         }
 
         return response
@@ -1004,6 +548,7 @@ async def predictive_analysis(
     except Exception as e:
         print("Error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 def suggest_target_and_features(df, api_key=None, verbose=True):
@@ -1237,29 +782,10 @@ async def get_available_models(
                 status_code=400, detail=f"Target column '{target_column}' not found in dataset"
             )
             
-        # Determine target type - improved logic
+        # Determine target type
         target_data = df[target_column]
+        is_categorical = target_data.dtype == "object" or target_data.dtype.name == "category"
         
-        # Check if target is categorical (object type or few unique values)
-        unique_values = target_data.nunique()
-        total_values = len(target_data)
-        
-        # More robust categorical detection:
-        # 1. Explicit object/category dtype
-        # 2. Few unique values relative to dataset size
-        # 3. String values even if pandas inferred as object
-        is_categorical = (
-            target_data.dtype == "object" or 
-            target_data.dtype.name == "category" or
-            (unique_values / total_values < 0.05 and unique_values <= 20) or
-            any(isinstance(x, str) for x in target_data.dropna().head(10))
-        )
-        
-        # Check if binary classification
-        is_binary = False
-        if is_categorical:
-            is_binary = unique_values == 2
-            
         available_models = []
         categorical_models = []
         regression_models = []
@@ -1271,12 +797,19 @@ async def get_available_models(
         binary_only_models = ["Logistic Regression"]
         
         if is_categorical:
+            # Check if binary classification
+            is_binary = target_data.nunique() == 2
+            
             # Add models for all classification types
             available_models.extend(categorical_models)
             
             # Add binary-only models if applicable
             if is_binary:
                 available_models.extend(binary_only_models)
+                
+            # Check for multi-class issues
+            if not is_binary and "Logistic Regression" in available_models:
+                available_models.remove("Logistic Regression")
         else:
             # For numeric targets, offer regression models
             available_models.extend(regression_models)
@@ -1348,16 +881,14 @@ async def get_available_models(
             "target_info": {
                 "is_categorical": is_categorical,
                 "is_binary": is_binary if is_categorical else False,
-                "unique_values": unique_values,
-                "dtype": str(target_data.dtype)
+                "unique_values": target_data.nunique() if is_categorical else None
             }
         }
         
     except Exception as e:
         print("Error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
-    
-    
+
 @app.post("/diagnostic-analysis")
 async def diagnostic_analysis(
     file: UploadFile = File(...), target_variable: str = Form(None)
