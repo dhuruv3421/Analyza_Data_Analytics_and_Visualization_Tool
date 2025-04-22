@@ -75,6 +75,22 @@ df_cache = {}
 
 
 # New endpoint to retrieve columns from uploaded file
+# @app.post("/upload-columns")
+# async def upload_columns(file: UploadFile = File(...)):
+#     try:
+#         df = await read_uploaded_file(file)
+
+#         # Cache the dataframe with a unique identifier (filename in this case)
+#         file_id = file.filename
+#         df_cache[file_id] = df
+
+#         # Return columns and a preview of the data
+#         return {
+#             "columns": df.columns.tolist(),
+#             "preview": df.head(5).to_dict(orient="records"),
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 @app.post("/upload-columns")
 async def upload_columns(file: UploadFile = File(...)):
     try:
@@ -87,10 +103,11 @@ async def upload_columns(file: UploadFile = File(...)):
         # Return columns and a preview of the data
         return {
             "columns": df.columns.tolist(),
-            "preview": df.head(5).to_dict(orient="records"),
+            "preview": json.loads(df.head(5).to_json(orient="records")),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @app.post("/analyze")
 async def analyze_data(file: UploadFile = File(...), query: str = Form(...)):
@@ -1061,6 +1078,42 @@ def suggest_target_and_features(df, api_key=None, verbose=True):
         return {"error": f"DataFrame analysis failed: {str(e)}"}
     
     # Construct prompt for Gemini
+    # prompt = f"""
+    # You are an expert data scientist analyzing a dataset to suggest machine learning targets and features.
+
+    # Dataset Overview:
+    # {json.dumps(column_info, indent=2)}
+
+    # Tasks:
+    # 1. Identify potential target columns for:
+    #    a) Classification (categorical targets with few unique values)
+    #    b) Regression (numeric targets with continuous distribution)
+    
+    # 2. For each potential target, suggest:
+    #    - Appropriate features
+    #    - Reasoning for feature selection
+    #    - Potential machine learning approach (classification/regression)
+
+    # 3. Provide a detailed explanation of your selection process.
+
+    # Return a structured JSON response with:
+    # {{
+    #     "potential_targets": [
+    #         {{
+    #             "column": "column_name",
+    #             "type": "classification/regression",
+    #             "reasoning": "Why this column is a good target"
+    #         }}
+    #     ],
+    #     "feature_suggestions": {{
+    #         "target_column": {{
+    #             "features": ["feature1", "feature2"],
+    #             "reasoning": "Why these features are relevant"
+    #         }}
+    #     }},
+    #     "overall_reasoning": "Comprehensive explanation of analysis"
+    # }}
+    # """
     prompt = f"""
     You are an expert data scientist analyzing a dataset to suggest machine learning targets and features.
 
@@ -1069,15 +1122,18 @@ def suggest_target_and_features(df, api_key=None, verbose=True):
 
     Tasks:
     1. Identify potential target columns for:
-       a) Classification (categorical targets with few unique values)
-       b) Regression (numeric targets with continuous distribution)
-    
-    2. For each potential target, suggest:
-       - Appropriate features
-       - Reasoning for feature selection
-       - Potential machine learning approach (classification/regression)
+    a) Classification — select only categorical columns that represent *practically meaningful* or *business-relevant outcomes* (e.g., product category, customer segment, purchase intent). 
+        - Avoid demographic or identity-related columns such as 'Gender', 'Name', 'Address', 'Contact', 'CustomerID', or similar unless the dataset is explicitly intended for predicting such attributes.
+    b) Regression — select numeric columns with continuous or ordinal values that make sense to predict (e.g., income, price, spending score).
 
-    3. Provide a detailed explanation of your selection process.
+    2. For each potential target, suggest:
+    - Appropriate features (columns likely to influence the target)
+    - Reasoning for selecting these features
+    - Suggested machine learning approach (classification or regression)
+
+    3. If no suitable classification target is available, do not suggest any. Avoid using inappropriate fallback targets (like 'Age' or 'Gender') for classification unless their prediction is contextually valid and meaningful.
+
+    4. Provide a detailed explanation of your selection and decision-making process.
 
     Return a structured JSON response with:
     {{
@@ -1097,7 +1153,6 @@ def suggest_target_and_features(df, api_key=None, verbose=True):
         "overall_reasoning": "Comprehensive explanation of analysis"
     }}
     """
-    
     if verbose:
         logging.info("Sending request to Generative AI model")
     
